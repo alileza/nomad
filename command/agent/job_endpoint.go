@@ -655,7 +655,7 @@ func ApiJobToStructJob(job *api.Job) *structs.Job {
 		j.TaskGroups = make([]*structs.TaskGroup, l)
 		for i, taskGroup := range job.TaskGroups {
 			tg := &structs.TaskGroup{}
-			ApiTgToStructsTG(taskGroup, tg)
+			apiTgToStructsTG(taskGroup, tg, job.Update)
 			j.TaskGroups[i] = tg
 		}
 	}
@@ -663,7 +663,7 @@ func ApiJobToStructJob(job *api.Job) *structs.Job {
 	return j
 }
 
-func ApiTgToStructsTG(taskGroup *api.TaskGroup, tg *structs.TaskGroup) {
+func apiTgToStructsTG(taskGroup *api.TaskGroup, tg *structs.TaskGroup, jobUpdate *api.UpdateStrategy) {
 	tg.Name = *taskGroup.Name
 	tg.Count = *taskGroup.Count
 	tg.Meta = taskGroup.Meta
@@ -710,17 +710,32 @@ func ApiTgToStructsTG(taskGroup *api.TaskGroup, tg *structs.TaskGroup) {
 		}
 	}
 
-	if taskGroup.Update != nil {
+	// Convert the UpdateStrategy, using defaults from the job
+	if taskGroup.Update != nil || jobUpdate != nil {
+		var au *api.UpdateStrategy
+		if jobUpdate != nil {
+			au = jobUpdate.Copy()
+			au.Merge(taskGroup.Update)
+		} else {
+			au = taskGroup.Update
+		}
+
 		tg.Update = &structs.UpdateStrategy{
-			Stagger:          *taskGroup.Update.Stagger,
-			MaxParallel:      *taskGroup.Update.MaxParallel,
-			HealthCheck:      *taskGroup.Update.HealthCheck,
-			MinHealthyTime:   *taskGroup.Update.MinHealthyTime,
-			HealthyDeadline:  *taskGroup.Update.HealthyDeadline,
-			ProgressDeadline: *taskGroup.Update.ProgressDeadline,
-			AutoRevert:       *taskGroup.Update.AutoRevert,
-			AutoPromote:      *taskGroup.Update.AutoPromote,
-			Canary:           *taskGroup.Update.Canary,
+			Stagger:          *au.Stagger,
+			MaxParallel:      *au.MaxParallel,
+			HealthCheck:      *au.HealthCheck,
+			MinHealthyTime:   *au.MinHealthyTime,
+			HealthyDeadline:  *au.HealthyDeadline,
+			ProgressDeadline: *au.ProgressDeadline,
+			Canary:           *au.Canary,
+		}
+
+		if au.AutoRevert != nil {
+			tg.Update.AutoRevert = *au.AutoRevert
+		}
+
+		if au.AutoPromote != nil {
+			tg.Update.AutoPromote = *au.AutoPromote
 		}
 	}
 
@@ -732,6 +747,10 @@ func ApiTgToStructsTG(taskGroup *api.TaskGroup, tg *structs.TaskGroup) {
 			tg.Tasks[l] = t
 		}
 	}
+}
+
+func ApiTgToStructsTG(taskGroup *api.TaskGroup, tg *structs.TaskGroup) {
+	apiTgToStructsTG(taskGroup, tg, nil)
 }
 
 // ApiTaskToStructsTask is a copy and type conversion between the API

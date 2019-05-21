@@ -611,7 +611,9 @@ func ApiJobToStructJob(job *api.Job) *structs.Job {
 		Affinities:  ApiAffinitiesToStructs(job.Affinities),
 	}
 
-	// COMPAT: Remove in 0.7.0. Update has been pushed into the task groups
+	// Update has been pushed into the task groups. stagger and max_parallel are
+	// preserved at the job level, but all other values are discarded. The job.Update
+	// api value is passed down to the taskgroups so that they can use it as a default
 	if job.Update != nil {
 		j.Update = structs.UpdateStrategy{}
 
